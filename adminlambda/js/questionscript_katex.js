@@ -1453,7 +1453,9 @@ function validateMissingImages(ele, vent) {
   var missingimagelist = '';
   var misClassNames = '';
   misClassNamesNoQuotes = [];
-  var missedImagLocation = {}
+  var missedImagLocation = {};
+
+  // Check legacy sprites
   $('.clbl .hscrollenable .sprite').each((i, v) => {
     if (isMissingSprite(v)) {
       missedImagLocation = $(v).closest("#question").find("#questionseqlbl")[0];
@@ -1461,8 +1463,20 @@ function validateMissingImages(ele, vent) {
       misClassNames += "\"" + v.className.replace(/sprite/, '').trim() + "\",\n";
       misClassNamesNoQuotes.push(v.className.replace(/sprite/, '').trim());
     }
-  })
-  //alert(missingimagelist);
+  });
+
+  // Check KaTeX inline img elements
+  $('.clbl .hscrollenable img').each((i, v) => {
+    if (v.naturalWidth === 0 || v.naturalHeight === 0) {
+      missedImagLocation = $(v).closest("#question").find("#questionseqlbl")[0];
+      missingimagelist += $(v).closest("#question").find("#questionseqlbl").html() + ", ";
+      let src = $(v).attr('src') || '';
+      let filename = src.substring(src.lastIndexOf('/') + 1);
+      misClassNames += "\"" + filename + "\",\n";
+      misClassNamesNoQuotes.push(filename);
+    }
+  });
+
   if (misClassNamesNoQuotes.length > 0) {
     document.title = misClassNamesNoQuotes.toString();
   }
