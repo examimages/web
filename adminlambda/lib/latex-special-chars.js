@@ -91,7 +91,7 @@ function performAscciOperations(st1) {
     st1 = st1.replace(/\\leftharpoondown/g, "↽");
     st1 = st1.replace(/\\rightharpoonup/g, "⇀");
     st1 = st1.replace(/\\rightharpoondown/g, "⇁");
-    st1 = st1.replace(/\\rightleftharpoons/g, "⇌");
+    st1 = st1.replace(/\\+rightleftharpoons/g, "⇌");
     st1 = st1.replace(/\\Leftarrow/g, "⇐");
     st1 = st1.replace(/\\Uparrow/g, "⇑");
     st1 = st1.replace(/\\mathcal{H}/g, "ℋ");
@@ -114,7 +114,7 @@ function performAscciOperations(st1) {
     st1 = st1.replace(/&\\Updownarrow/g, "⇕");
 
     st1 = st1.replace(/\\leftrightharpoons/g, "⇋");
-    st1 = st1.replace(/\\rightleftharpoons/g, "⇌");
+    st1 = st1.replace(/\\+rightleftharpoons/g, "⇌");
 
     st1 = st1.replace(/\\leftrightarrows/g, "⇆");
     st1 = st1.replace(/\\rightleftarrows/g, "⇄");

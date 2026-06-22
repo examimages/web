@@ -108,6 +108,22 @@ $(function () {
     stopscroll(event);
     publishnotestos3(this);
   });
+
+  $(document).on("click", ".fix-katex-note", function (event) {
+    stopscroll(event);
+    fixKatexNote(this);
+  });
+
+  // Automatically render formulas on page load
+  if (true) {
+    $(".previewsrc").trigger("input");
+    $(".topicslist .subtopic").each(function() {
+      const rawText = $(this).find("#subtopictext").val() || "";
+      if (rawText) {
+         $(this).find("#subtopiclbl").html(getFormulaText(rawText));
+      }
+    });
+  }
 });
 
 function sorttopicseqnumbers() {
@@ -207,10 +223,9 @@ function saveTopicsData(that, vent) {
     .find("#subtopiclist>li")
     .each(function (idx, val) {
       let ldata = {};
-      ldata.text = $(val).find("#subtopictext").val()
-        ? $(val).find("#subtopictext").val()
-        : "";
-      ldata.textseq = idx;
+      const valText = $(val).find("#subtopictext").val() || "";
+      ldata.text = valText;
+      ldata.textseq = (idx + 1) * 10;
       topicdata.topiccontent.push(ldata);
     });
 
@@ -316,6 +331,20 @@ function validateNotesMissingImages(ele, vent) {
       misClassNamesNoQuotes.push(v.className.replace(/sprite/, "").trim());
     }
   });
+
+  // Check converted/new img elements anywhere inside clbl elements
+  $(".clbl img").each((i, v) => {
+    if (v.naturalWidth === 0 || v.naturalHeight === 0 || (v.complete && v.naturalWidth === 0)) {
+      missedImagLocation = $(v).closest("#topic").find("#topicseq")[0];
+      missingimagelist +=
+        $(v).closest("#topic").find("#topicseq").html() + ", ";
+      let src = $(v).attr("src") || "";
+      let filename = src.substring(src.lastIndexOf("/") + 1);
+      misClassNames += '"' + filename + '",\n';
+      misClassNamesNoQuotes.push(filename);
+    }
+  });
+
   if (misClassNamesNoQuotes.length > 0) {
     document.title = misClassNamesNoQuotes.toString();
   }
@@ -335,7 +364,7 @@ function validateNotesMissingImages(ele, vent) {
     misClassNames = "None Missing.";
   }
 
-  return misClassNames;
+  return misClassNamesNoQuotes.toString();
 }
 
 function downloadnotesformobile(that) {
@@ -385,7 +414,7 @@ function downloadnotesfornewmobile(that) {
   data.testid = testdata.testid;
   data.categorykey = $('#testdetails').attr('categorykey');
   data.is_cdn_https = testdata.is_cdn_https;
-  data.cdn_root_key = testdata.cdn_root_key || 'CDN1';
+  data.cdn_root_key = testdata.cdn_root_key || 'EXAMCDN1';
   data.questionImagesCdn = testdata.test_image;
   
   data.questionImages = (testdata.test_image) ? testdata.test_image.substring(testdata.test_image.lastIndexOf('/') + 1, testdata.test_image.length) : ''
@@ -451,7 +480,7 @@ function downloadnotesfornewmobile_examsnetapp(that) {
   data.testid = testdata.testid;
   data.categorykey = $('#testdetails').attr('categorykey');
   data.is_cdn_https = testdata.is_cdn_https;
-  data.cdn_root_key = testdata.cdn_root_key || 'CDN1';
+  data.cdn_root_key = testdata.cdn_root_key || 'EXAMCDN1';
   data.questionImagesCdn = testdata.test_image;
   data.questionImages = (testdata.test_image) ? testdata.test_image.substring(testdata.test_image.lastIndexOf('/') + 1, testdata.test_image.length) : ''
   data.topics = [];
@@ -564,4 +593,56 @@ function copyImageTag(ele, eve) {
   }
   console.log(imageTag);
   copyToClipboard(imageTag);
+}
+
+async function fixKatexNote(ele) {
+  const $button = $(ele);
+  const $topic = $button.closest("#topic");
+  const mid = $topic.attr("mid");
+  const collection = globals.collection || "";
+
+  if (!mid) {
+      bootstrap_alert.error($topic.find("#alertplaceholder"), "Please save the topic first before converting to KaTeX.");
+      return;
+  }
+
+  const originalHtml = $button.html();
+  $button.html('<i class="fa-solid fa-spinner fa-spin"></i>').addClass("disabled");
+
+  try {
+      const response = await fetch("/notes/fixKatex", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+              collection,
+              mid,
+              model: $("#modelSelect").val() || ""
+          })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+          if (Array.isArray(data.topiccontent)) {
+              let idx = 0;
+              $topic.find("#subtopiclist>li").each(function () {
+                  const optVal = data.topiccontent[idx++];
+                  if (optVal !== undefined) {
+                      $(this).find(".valuetextbox").val(optVal);
+                      $(this).find(".previewsrc").val(optVal);
+                      $(this).find(".previewsrc").trigger("input");
+                  }
+              });
+          }
+          bootstrap_alert.success($topic.find("#alertplaceholder"), "KaTeX formula fix completed and saved successfully!");
+      } else {
+          bootstrap_alert.error($topic.find("#alertplaceholder"), "Conversion failed: " + (data.message || "Unknown error"));
+      }
+  } catch (err) {
+      console.error(err);
+      bootstrap_alert.error($topic.find("#alertplaceholder"), "Error connecting to server: " + err.message);
+  } finally {
+      $button.html(originalHtml).removeClass("disabled");
+  }
 }

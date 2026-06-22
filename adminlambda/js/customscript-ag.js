@@ -9,6 +9,7 @@ var SCREENLIST = {
   USERPROFILES: 'USERPROFILES',
   ACTIONS: 'ACTIONS',
   NOTECHAPTERS: 'NOTECHAPTERS',
+  CHAPTERS: 'CHAPTERS',
 }
 function generateTempId() {
   return "temp_" + Math.random().toString(36).substring(2, 11);
@@ -17,8 +18,46 @@ function generateTempId() {
 function custOnAgGridReady(params) {
   console.log("On Grid Ready fired..")
   gridApi = params.api;
-  columnApi = params.columnApi.api;   
+  columnApi = params.api; // AG Grid v31+: columnApi merged into api
+
+  // Restore column visibility preference (skip for subjects and chapters page to keep hidden by default)
+  if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+    const showUtils = localStorage.getItem('showGridUtilityCols') === 'true';
+    if (showUtils) {
+      let colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+      if (currentScreen === SCREENLIST.CHAPTERS) {
+        colsToToggle = ["data-actions", "utility-actions"];
+      }
+      columnApi.setColumnsVisible(colsToToggle, true);
+      $('.toggleUtilityCols').removeClass('btn-outline-secondary').addClass('btn-secondary active');
+    }
+  }
 }
+
+$(document).on('click', '.toggleUtilityCols', function (event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const isVisible = columnApi.getColumn('utility-actions') ? columnApi.getColumn('utility-actions').isVisible() : false;
+  
+  let colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+  if (currentScreen === SCREENLIST.SUBJECTS) {
+    colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+  } else if (currentScreen === SCREENLIST.CHAPTERS) {
+    colsToToggle = ["data-actions", "utility-actions"];
+  }
+  columnApi.setColumnsVisible(colsToToggle, !isVisible);
+  
+  if (!isVisible) {
+    $('.toggleUtilityCols').removeClass('btn-outline-secondary').addClass('btn-secondary active');
+    if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+      localStorage.setItem('showGridUtilityCols', 'true');
+    }
+  } else {
+    $('.toggleUtilityCols').removeClass('btn-secondary active').addClass('btn-outline-secondary');
+    if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+      localStorage.setItem('showGridUtilityCols', 'false');
+    }
+  }
+});
 
 function cellDataChanged(params) {
   console.log("Cell Data values changed..")

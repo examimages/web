@@ -76,6 +76,7 @@ function performLatexOperations(st1) {
     st1 = substack_check(st1);
 
     st1 = undersetcheck(st1);
+    st1 = oversetcheck(st1);
     st1 = casescheck(st1);
     st1 = matricescheck(st1);
     console.log(st1);
@@ -775,6 +776,42 @@ function undersetcheck(input) {
         while (input.search(re) >= 0) {
             input = input.replace(re, (match, one, two) => {
                 return `\\;{${two}}↙{${one}}`;
+            });
+        }
+    }
+
+    return input;
+}
+
+function oversetcheck(input) {
+    // Step 1: Normalize any malformed or nested \overset inside the first argument
+    const fixNestedOverset = /\\overset\s*{((?!\\overset{).*?)}{((?!\\overset{).*?)}/;
+    let nestedFixMatch = true;
+    while (nestedFixMatch) {
+        nestedFixMatch = false;
+        input = input.replace(fixNestedOverset, (match, a, b) => {
+            nestedFixMatch = true;
+            if (a.includes('\\overset')) {
+                a = a.replace(/\\overset/, '');
+                return '\\overset{' + a + '}{' + b + '}';
+            }
+            return '\\;{' + b + '}↖{' + a + '}';
+        });
+    }
+
+    // Step 2: Handle various patterns of \overset from complex to simple
+    const regexes = [
+        /\\overset({[^}]*{[^}]*}[^}]*}+)\s*({[^}]*{[^}]*}[^}]*}+)/gm,
+        /\\overset{([^}]*{[^}]*}[^}]*)}\s*({[^}]*{[^}]*}[^}]*}+)/gm,
+        /\\overset{([^}]*{[^}]*}[^}]*)}{([^}]*)}/gm,
+        /\\overset{([^}]*)}{([^}]*{[^}]*}[^}]*)}/gm,
+        /\\overset{([^}]*)}{([^}]*)}/gm
+    ];
+
+    for (const re of regexes) {
+        while (input.search(re) >= 0) {
+            input = input.replace(re, (match, one, two) => {
+                return `\\;{${two}}↖{${one}}`;
             });
         }
     }

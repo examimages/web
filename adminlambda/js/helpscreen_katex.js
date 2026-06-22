@@ -6,8 +6,61 @@ $(function () {
         renderKatexHelpPreview();
     });
 
-
-
+    $(document).on('click', '#btnFixKatex', function (event) {
+        event.preventDefault();
+        const input = $('#geminiKatexInput').val();
+        if (!input) return;
+ 
+        const btn = $(this);
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Translating...');
+ 
+        const selectedModel = $('#modelSelect').val();
+        $.ajax({
+            url: '/tests/testFixKatex',
+            method: 'POST',
+            data: { input: input, model: selectedModel },
+            success: function (response) {
+                btn.prop('disabled', false).html(originalText);
+                if (response.success) {
+                    $('#geminiLatexOutput').val(response.latex);
+                    $('#geminiPreview').html(getFormulaText(response.latex));
+                } else {
+                    $('#geminiLatexOutput').val("Error: " + response.error);
+                    $('#geminiPreview').html('<span class="text-danger">Translation failed: ' + response.error + '</span>');
+                }
+            },
+            error: function (xhr, status, error) {
+                btn.prop('disabled', false).html(originalText);
+                $('#geminiLatexOutput').val("AJAX Error: " + error);
+                $('#geminiPreview').html('<span class="text-danger">AJAX Error: ' + error + '</span>');
+            }
+        });
+    });
+ 
+    $(document).on('click', '#btnCopyLatex', function (event) {
+        event.preventDefault();
+        const latex = $('#geminiLatexOutput').val();
+        if (!latex) return;
+ 
+        navigator.clipboard.writeText(latex).then(() => {
+            const btn = $(this);
+            const originalText = btn.html();
+            btn.html('<i class="fas fa-check"></i> Copied!');
+            setTimeout(() => {
+                btn.html(originalText);
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+    });
+ 
+    $(document).on('input', '#geminiLatexOutput', function (event) {
+        const val = $(this).val();
+        $('#geminiPreview').html(getFormulaText(val));
+    });
+ 
+ 
     $(document).on('click', '#createtable', function (event) {
         stopscroll(event)
         buildTable();

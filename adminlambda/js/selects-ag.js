@@ -31,10 +31,10 @@ function decisionFormatter(params) {
 
 
 const cdnRoots = [
-    { key: 'CDN1', title: 'CDN 1' },
-    { key: 'CDN2', title: 'CDN 2' },
     { key: 'EXAMCDN1', title: 'EXAMCDN1' },
-    { key: 'EXAMCDN2', title: 'EXAMCDN2' }
+    { key: 'EXAMCDN2', title: 'EXAMCDN2' },
+    { key: 'EXAMCDN3', title: 'EXAMCDN3' },
+    { key: 'CDN1', title: 'CDN1' }
 ];
 
 const cdnRootOptions = cdnRoots.map(root => root.key);
@@ -42,7 +42,7 @@ const cdnRootParams = { values: cdnRootOptions }
 
 function cdnRootFormatter(params) {
     const root = cdnRoots.find(root => root.key === params.value);
-    return root ? root.title : (params.value || 'CDN 1');
+    return root ? root.title : (params.value || 'EXAMCDN1');
 }
 
 

@@ -11,7 +11,7 @@ var endDefaultCols = [
 var adminColsTestPage = [
 
     { headerName: 'Published', field: 'published', cellEditor: 'agSelectCellEditor', hide: false, cellEditorParams: decisionParams, valueFormatter: decisionFormatter, editable: false, width: 100 },
-    { headerName: 'KaTeX', field: 'is_katex', cellEditor: 'agSelectCellEditor', hide: false, cellEditorParams: decisionParams, valueFormatter: decisionFormatter, editable: false, width: 90 },
+
     { headerName: 'Language', field: 'test_lang', cellEditor: 'agSelectCellEditor', hide: false, cellEditorParams: languageParams, valueFormatter: languageFormatter, editable: false, flex: 1 },
 
     { headerName: 'CSS Path', field: 'test_image', cellClass: 'ag-cell-no-wrap', hide: true, editable: false, flex: 1 },
@@ -32,7 +32,7 @@ var adminColsTestPage = [
     { headerName: 'Mobile File Name', field: 'mobile_file_name', hide: true, editable: false, cellClass: 'ag-cell-no-wrap' },
     { headerName: 'HTML Title', field: 't_title', hide: true, cellClass: 'ag-cell-no-wrap' },
     { headerName: 'Data Actions', field: 'data-actions', cellRenderer: dataactions, pinned: 'right', hide: true, width: 230 },
-    { headerName: 'Publish Actions', field: 'selenium-actions', cellRenderer: seleniumActions, pinned: 'right', hide: true, width: 280 },
+
     { headerName: 'Utilities', field: 'extra-actions', cellRenderer: extraactions, pinned: 'right', hide: false, flex: 1 },
     { headerName: 'Del', field: 'delete-action', cellRenderer: deleteRender, width: 50, hide: true, pinned: 'right' },
 ]
@@ -63,7 +63,7 @@ var adminColsTestPage = [
     { headerName: 'Mobile File Name', field: 'mobile_file_name', editable: false, cellClass: 'ag-cell-no-wrap' }, 
     { headerName: 'HTML Title', field: 't_title', hide: true, cellClass: 'ag-cell-no-wrap' },
     { headerName: 'Data', field: 'data-actions', cellRenderer: dataactions, pinned: 'right', hide:true, width:230},
-    { headerName: 'Selenium', field: 'selenium-actions', cellRenderer: seleniumActions, pinned: 'right', hide:true, width:100},
+
     { headerName: 'Actions', field: 'extra-actions', cellRenderer: extraactions, pinned: 'right', hide:true, flex:1 },
     { headerName: 'Del', field: 'delete-action', cellRenderer: deleteRender, width: 50, hide:true, pinned: 'right' },
 ]
@@ -109,13 +109,12 @@ function triggerCellValueChangedForColumn(columnField) {
 
         // Construct the params object for onCellValueChanged
         var params = {
-            column: columnApi.getColumnState().find(col => col.colId === columnField),
+            column: { colId: columnField },
             node: node,
             data: data,
             newValue: value,
             oldValue: value,
             api: gridApi,
-            columnApi: columnApi
         };
 
         // Call the onCellValueChanged function directly
@@ -129,8 +128,7 @@ function triggerCellValueChangedForColumn(columnField) {
 
 function onAgGridReady(params) {
     gridApi = params.api;
-    columnApi = params.columnApi.api;
-    //columnApi.autoSizeColumns(["test_name"])
+    columnApi = params.api; // AG Grid v31+: columnApi merged into api
     updateLanguageSelectionButtonLabel();
     updateBulkCdnRootToggleButtonLabel();
 }
@@ -318,61 +316,6 @@ function dataactions(params) {
     return container;
 }
 
-function seleniumActions(params) {
-    const container = document.createElement('div');
-    let buttonHtml = ``
-    if (params.data._id) {
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-warning texturepackimages" id="texturepackimages" data-id="${params.data._id}" title="Texture Packer Images to Github Folder from Google Drive">
-            <i class="fas fa-yin-yang"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-success seleniumPublishAllByTest" id="seleniumPublishAllByTest" data-id="${params.data._id}" title="Selenium Publish All Targets By Test">
-            <i class="fa-solid fa-rocket"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-warning seleniumMissingImagesByTest" id="seleniumMissingImagesByTest" data-id="${params.data._id}" title="Selenium Missing Images By Test">
-            <i class="fa-solid fa-images"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-warning mx-1 seleniumMissingCorrectByTest" id="seleniumMissingCorrectByTest" data-id="${params.data._id}" title="Selenium Missing Correct Answers By Test">
-            <i class="fa-solid fa-check"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-info seleniumSortQuestionsByTest" id="seleniumSortQuestionsByTest" data-id="${params.data._id}" title="Selenium Sort Questions By Test">
-            <i class="fa-solid fa-arrow-down-1-9"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-        buttonHtml +=
-            `<a href="#" class="btn btn-sm btn-outline-warning mx-1 seleniumUpdateLinkedByTest" id="seleniumUpdateLinkedByTest" data-id="${params.data._id}" title="Selenium Update Linked Questions By Test">
-            <i class="fa-solid fa-magnet"></i><i class="fa-solid fa-spinner fa-spin-pulse" style="display: none;"></i>
-         </a>`;
-    }
-
-
-    container.innerHTML = buttonHtml;
-    if (container.querySelector('.texturepackimages')) {
-        container.querySelector('.texturepackimages').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-    if (container.querySelector('.seleniumMissingImagesByTest')) {
-        container.querySelector('.seleniumMissingImagesByTest').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-    if (container.querySelector('.seleniumPublishAllByTest')) {
-        container.querySelector('.seleniumPublishAllByTest').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-    if (container.querySelector('.seleniumMissingCorrectByTest')) {
-        container.querySelector('.seleniumMissingCorrectByTest').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-    if (container.querySelector('.seleniumSortQuestionsByTest')) {
-        container.querySelector('.seleniumSortQuestionsByTest').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-    if (container.querySelector('.seleniumUpdateLinkedByTest')) {
-        container.querySelector('.seleniumUpdateLinkedByTest').addEventListener('click', (event) => handleButtonClick(event, params));
-    }
-
-
-    return container;
-}
-
 function extraactions(params) {
     const container = document.createElement('div');
     let buttonHtml = `<span class='total-recs'></span>`
@@ -484,12 +427,7 @@ function handleButtonClick(event, params) {
         'copy-collection-details': () => copyCollectionDetails(params),
         'texturepackimages': () => texturepackimages(event, params),
         'copytospritepath': () => copytospritepath(event, params),
-        'youtubetime': () => updateyoutubetime(event, params),
-        'seleniumMissingImagesByTest': () => seleniumMissingImagesByTest(event, params),
-        'seleniumPublishAllByTest': () => seleniumPublishAllByTest(event, params),
-        'seleniumMissingCorrectByTest': () => seleniumMissingCorrectByTest(event, params),
-        'seleniumSortQuestionsByTest': () => seleniumSortQuestionsByTest(event, params),
-        'seleniumUpdateLinkedByTest': () => seleniumUpdateLinkedByTest(event, params)
+        'youtubetime': () => updateyoutubetime(event, params)
     };
 
     const handler = actionHandlers[event.currentTarget.id];
@@ -678,12 +616,7 @@ $(function () {
     });
 
 
-    $(document).on('click', '.seleniumActions', function (event) {
-        stopscroll(event);
-        var visibility = columnApi.getColumn("selenium-actions").visible
-        columnApi.setColumnVisible("selenium-actions", !visibility);
 
-    });
 
     $(document).on('click', '.dataActions', function (event) {
         stopscroll(event);
@@ -789,16 +722,16 @@ function getBulkCdnRootTarget() {
 
     gridApi.forEachNode((node) => {
         hasRows = true;
-        if ((node.data.cdn_root_key || cdnRootOptions[0]) !== 'CDN2') {
+        if ((node.data.cdn_root_key || cdnRootOptions[0]) !== 'EXAMCDN2') {
             allRowsAreCdn2 = false;
         }
     });
 
     if (!hasRows) {
-        return 'CDN2';
+        return 'EXAMCDN2';
     }
 
-    return allRowsAreCdn2 ? 'CDN1' : 'CDN2';
+    return allRowsAreCdn2 ? 'EXAMCDN1' : 'EXAMCDN2';
 }
 
 function updateBulkCdnRootToggleButtonLabel() {
@@ -959,7 +892,7 @@ function buildNewTestRow(defaultTestName, langId, seqValue, testIdValue) {
         subjectid: globals.subjdetails.subjectid,
         chapterid: globals.subjdetails.chapterid,
         published: decisionOptions[0],
-        is_katex: decisionOptions[0],
+
         test_lang: langId,
         test_image: '',
         yoututbeids: '',
@@ -999,7 +932,6 @@ async function addRowsForSelectedLanguages() {
 }
 
 function updateMobileFileNames(jsonArray) {
-    // Step 1: Group objects by t_title
     const groups = jsonArray.reduce((acc, obj) => {
         if (!acc[obj.t_title]) {
             acc[obj.t_title] = [];
@@ -1008,24 +940,26 @@ function updateMobileFileNames(jsonArray) {
         return acc;
     }, {});
 
-    // Step 2: Iterate over each group and update mobile_file_name
     for (const group of Object.values(groups)) {
-        // Find the object with test_lang == "en"
         const enObject = group.find(obj => obj.test_lang === "en");
-        if (enObject) {
-            const enId = enObject._id; // Get the _id of the English object
-            // Update mobile_file_name for all objects in the group where mobile_file_name is empty
+        if (enObject && !enObject._id.startsWith("temp")) {
+            const enId = enObject._id;
             group.forEach(obj => {
-                if (!obj.mobile_file_name) { // Check if mobile_file_name is empty
-                    if(!enId.startsWith("temp")){
-                            obj.mobile_file_name = enId;
-                    }
+                if (!obj.mobile_file_name) {
+                    obj.mobile_file_name = enId;
+                }
+            });
+        } else {
+            // No English version in group — each row uses its own _id as fallback
+            group.forEach(obj => {
+                if (!obj.mobile_file_name && obj._id && !obj._id.startsWith("temp")) {
+                    obj.mobile_file_name = obj._id;
                 }
             });
         }
     }
 
-    return jsonArray; // Return the modified array
+    return jsonArray;
 }
 
 function replaceAndFormatDate(inputString) {
@@ -1102,7 +1036,34 @@ function saveAllTestRows() {
 
     }
     rowsToSave = rowsToSave.filter((row) => row.test_name && row.test_name.length > 0);
-    rowsToSave = updateMobileFileNames(rowsToSave);
+
+    // Collect ALL grid rows so updateMobileFileNames can find English counterparts
+    // even for rows that weren't edited. t_title is already fresh for edited rows
+    // (updated by the loop above via object reference), and we regenerate it here
+    // for any other row that still has an empty t_title in the DB.
+    var allRows = [];
+    gridApi.forEachNode(function (node) {
+        if (!node.data.t_title && node.data.test_name) {
+            node.data.t_title = generateHTMLTitle(node.data, globals.screen);
+        }
+        allRows.push(node.data);
+    });
+
+    var emptyMobileRows = new Set();
+    allRows.forEach(function (row) {
+        if (!row.mobile_file_name) emptyMobileRows.add(row._id || row.testid);
+    });
+
+    updateMobileFileNames(allRows);
+
+    // Add rows that just got mobile_file_name filled in to the save batch
+    allRows.forEach(function (row) {
+        var key = row._id || row.testid;
+        if (key && emptyMobileRows.has(key) && row.mobile_file_name) {
+            var alreadyIn = rowsToSave.some(function (r) { return (r._id || r.testid) === key; });
+            if (!alreadyIn) rowsToSave.push(row);
+        }
+    });
 
     let input = {
         data: rowsToSave
@@ -1413,65 +1374,4 @@ function convertToYouTubeFormat(inputString) {
             yttime: formattedTime
         };
     });
-}
-
-
-function seleniumMissingImagesByTest(event, params) {
-    let spinner = $(event.currentTarget).find('.fa-spinner');
-    $(spinner).show();
-    ajaxRequest("/selenium/findMissingImagesByTestId/" + params.data.subject_key + '/' + params.data.chapterid + '/' + params.data._id, 'GET', { imgpath: params.data.test_image },
-        function (result) {
-            $(spinner).removeClass('fa-spin-pulse');
-        },
-        function (result) {
-            $(spinner).hide();
-        });
-}
-
-function seleniumPublishAllByTest(event, params) {
-    let spinner = $(event.currentTarget).find('.fa-spinner');
-    $(spinner).show();
-    ajaxRequest("/selenium/publishallbytestid/" + params.data.subject_key + '/' + params.data.chapterid + '/' + params.data._id, 'GET', {},
-        function (result) {
-            $(spinner).removeClass('fa-spin-pulse');
-        },
-        function (result) {
-            $(spinner).hide();
-        });
-}
-
-function seleniumMissingCorrectByTest(event, params) {
-    let spinner = $(event.currentTarget).find('.fa-spinner');
-    $(spinner).show();
-    ajaxRequest("/selenium/findMissingCorrectAnswerByTestId/" + params.data.subject_key + '/' + params.data.chapterid + '/' + params.data._id, 'GET', {},
-        function (result) {
-            $(spinner).removeClass('fa-spin-pulse');
-        },
-        function (result) {
-            $(spinner).hide();
-        });
-}
-
-function seleniumSortQuestionsByTest(event, params) {
-    let spinner = $(event.currentTarget).find('.fa-spinner');
-    $(spinner).show();
-    ajaxRequest("/selenium/sortQuestionsByTestId/" + params.data.subject_key + '/' + params.data.chapterid + '/' + params.data._id, 'GET', {},
-        function (result) {
-            $(spinner).removeClass('fa-spin-pulse');
-        },
-        function (result) {
-            $(spinner).hide();
-        });
-}
-
-function seleniumUpdateLinkedByTest(event, params) {
-    let spinner = $(event.currentTarget).find('.fa-spinner');
-    $(spinner).show();
-    ajaxRequest("/selenium/updateLinkedQuestionsByTestId/" + params.data.subject_key + '/' + params.data.chapterid + '/' + params.data._id, 'GET', {},
-        function (result) {
-            $(spinner).removeClass('fa-spin-pulse');
-        },
-        function (result) {
-            $(spinner).hide();
-        });
 }

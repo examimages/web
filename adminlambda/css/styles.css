@@ -13826,9 +13826,79 @@ body.admin-shell.dark-theme .btn-default:hover {
   }
 }
 
-/* Force hide mathml rendering to prevent double formula rendering */
-.katex-mathml {
-  display: none !important;
+body.admin-shell.dark-theme .table {
+  background-color: #242526 !important;
+  color: #b0b3b8 !important;
+  --bs-table-border-color: #3a3b3c !important;
+  --bs-table-bg: #242526 !important;
+  border-color: #3a3b3c !important;
+}
+
+body.admin-shell.dark-theme .table th,
+body.admin-shell.dark-theme .table-bordered th {
+  background-color: #18191a !important;
+  color: #e4e6eb !important;
+  border-color: #3a3b3c !important;
+}
+
+body.admin-shell.dark-theme .table td,
+body.admin-shell.dark-theme .table-bordered td {
+  border-color: #3a3b3c !important;
+}
+
+body.admin-shell.dark-theme img {
+  filter: invert(1) !important;
+}
+
+body.admin-shell.dark-theme .alert {
+  background-color: #242526 !important;
+  color: #e4e6eb !important;
+  border-color: #3a3b3c !important;
+}
+
+body.admin-shell.dark-theme .alert-success {
+  background-color: rgba(25, 135, 84, 0.15) !important;
+  color: #75b798 !important;
+  border-color: rgba(25, 135, 84, 0.3) !important;
+}
+
+body.admin-shell.dark-theme .alert-danger {
+  background-color: rgba(220, 53, 69, 0.15) !important;
+  color: #ea868f !important;
+  border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+body.admin-shell.dark-theme .alert-warning {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+  color: #ffda6a !important;
+  border-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+body.admin-shell.dark-theme .alert-info {
+  background-color: rgba(13, 202, 240, 0.15) !important;
+  color: #6edff6 !important;
+  border-color: rgba(13, 202, 240, 0.3) !important;
+}
+
+body.admin-shell.dark-theme .alert-dismissible .btn-close,
+body.admin-shell.dark-theme .btn-close {
+  filter: invert(1) !important;
+  opacity: 0.8;
+}
+
+body.admin-shell.dark-theme .alert-dismissible .btn-close:hover,
+body.admin-shell.dark-theme .btn-close:hover {
+  opacity: 1;
+}
+
+/* Custom break spacer element spacing */
+.custom-break {
+  display: block !important;
+  height: 0 !important;
+  margin-top: 1.2rem !important;
+  margin-bottom: 1.2rem !important;
 }
 
 /*# sourceMappingURL=styles.css.map */
+
+

@@ -708,11 +708,15 @@
      * Convert extended arrows: {───────▶}↙{bottom}↖{top} → \xrightarrow[bottom]{top}
      */
     function convertExtendedArrows(input) {
-        var arrow = '\\{?[\\s\\;]*───────▶[\\s\\;]*\\}?';
+        var arrow = '\\{?[\\s\\;]*(?:───────▶|[─–-]+[▶▸►>]|&gt;)[\\s\\;]*\\}?';
 
-        // \xrightarrow[bottom]{top}
+        // \xrightarrow[bottom]{top} (↙ then ↖)
         var regexBoth = new RegExp(arrow + '↙\\{([^}]+)\\}↖\\{([^}]+)\\}', 'g');
         input = input.replace(regexBoth, '\\xrightarrow[$1]{$2}');
+
+        // \xrightarrow[bottom]{top} (↖ then ↙)
+        var regexBothReverse = new RegExp(arrow + '↖\\{([^}]+)\\}↙\\{([^}]+)\\}', 'g');
+        input = input.replace(regexBothReverse, '\\xrightarrow[$2]{$1}');
 
         // \xrightarrow[bottom]{}
         var regexBottom = new RegExp(arrow + '↙\\{([^}]+)\\}', 'g');

@@ -59,7 +59,7 @@ function handleCtrlKey(e, element) {
             break;
         case 'ArrowUp':
             e.preventDefault();
-            appendsymbols(element, '↖{', '}');
+            appendsymbols(element, '\\overset{', '}{}');
             break;
         case 'ArrowRight':
             e.preventDefault();
@@ -67,7 +67,7 @@ function handleCtrlKey(e, element) {
             break;
         case 'ArrowDown':
             e.preventDefault();
-            appendsymbols(element, '↙{', '}');
+            appendsymbols(element, '\\underset{', '}{}');
             break;
         case 'Digit1':
             e.preventDefault();
@@ -143,7 +143,7 @@ function handleCtrlKey(e, element) {
             break;
         case 'KeyT':
             e.preventDefault();
-            $('#latexToJQMath').trigger('click');
+            $('#btnFixKatex').trigger('click');
             break;
         case 'KeyU':
             e.preventDefault();
@@ -163,7 +163,7 @@ function handleCtrlKey(e, element) {
             break;
         case 'Backquote':
             e.preventDefault();
-            appendsymbols(element, '\\text "', '"');
+            appendsymbols(element, '\\text{', '}');
             break;
         case 'BracketLeft':
             e.preventDefault();
@@ -286,9 +286,9 @@ function handleAltKey(e, element) {
             addsymbols(element, 'ω');
             break;
         case 'KeyZ':
-                e.preventDefault();
-                replaceSelectedText(latex_to_js(getselectedText())); 
-                break;
+            e.preventDefault();
+            replaceSelectedText(convertNewLineToBrSafely(getselectedText()));
+            break;
         case 'Semicolon':
             e.preventDefault();
             addsymbols(element, '∴');
@@ -422,6 +422,11 @@ $(document).on('keydown', 'input[type=text], textarea', function(e) {
 
 
 
+let lastActiveElement = null;
+$(document).on('focus', 'input[type=text], textarea', function() {
+    lastActiveElement = this;
+});
+
 function scrollToEle(ele) {
     if (ele && $(ele).offset()) {
         var pos = $(ele).offset().top;
@@ -432,20 +437,35 @@ function scrollToEle(ele) {
 
 }
 
-function getselectedText(){
+function getselectedText(element){
+    let activeEl = element || lastActiveElement || document.activeElement;
+    if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && activeEl.type === 'text'))) {
+        return activeEl.value.substring(activeEl.selectionStart, activeEl.selectionEnd);
+    }
     var text = ''; 
     if (window.getSelection) {
-        text = window.getSelection();
+        text = window.getSelection().toString();
 
     } else if (document.getSelection) {
-        text = document.getSelection();
+        text = document.getSelection().toString();
 
     } else if (document.selection) {
         text = document.selection.createRange().text;
     } 
-    return text.toString();
+    return text;
 }
-function replaceSelectedText(replacementText) {
+function replaceSelectedText(replacementText, element) {
+    let activeEl = element || lastActiveElement || document.activeElement;
+    if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && activeEl.type === 'text'))) {
+        let start = activeEl.selectionStart;
+        let end = activeEl.selectionEnd;
+        let val = activeEl.value;
+        activeEl.value = val.substring(0, start) + replacementText + val.substring(end);
+        activeEl.selectionStart = start + replacementText.length;
+        activeEl.selectionEnd = start + replacementText.length;
+        $(activeEl).trigger('input');
+        return;
+    }
     if (document.queryCommandSupported('insertText')) {
         document.execCommand('insertText', false, replacementText);
     } else {
@@ -468,36 +488,128 @@ function addsymbols(ele, symbol) {
     replaceSelectedText(symbol); 
 }
 
-function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function convertNewLineToBrSafely(text) {
+    const mathBlocks = [];
+    let placeholderId = 0;
+    const mathPattern = /\$\$[\s\S]+?\$\$|\$(?!\$)(?:[^\$\\]|\\.)+?\$|\\\(.*?\\\)|\\\[.*?\\\]/g;
+    let processedText = text.replace(mathPattern, function(match) {
+        const placeholder = `__MATH_BLOCK_TEMP_${placeholderId}__`;
+        mathBlocks.push({ placeholder, content: match });
+        placeholderId++;
+        return placeholder;
+    });
+    processedText = processedText.replace(/\r?\n/g, ' <br> ');
+    processedText = processedText.replace(/(?:<br>\s*){3,}/gi, function(match) {
+        let count = (match.match(/<br>/gi) || []).length;
+        return '<br> '.repeat(count - 1);
+    });
+    mathBlocks.forEach(block => {
+        processedText = processedText.replace(block.placeholder, block.content);
+    });
+    return processedText;
 }
 
 function replaceBRwithNewLineAndBR(str) { 
     str = str.replace(/<br>/g, "\n <br>");
-    str = str; 
-    var matches = str.match(/\$(?:[^\$\\]|\\.)*\$/g);
-    if (matches && matches.length > 0) {
-        matches.forEach(function(match) { 
-            str = str.replace(match, '\n' + match + '\n'); 
-        });
-    }
+    str = str.replace(/\$\$[\s\S]+?\$\$|\$(?!\$)[^$\n]+?\$(?!\$)/g, function(match) {
+        return '\n' + match + '\n';
+    });
     str = str.replace(/\n+/g, '\n');
     return str;
 }
 
 
 function getFormulaText(text) {   
-    var matches = text.match(/\$(?:[^\$\\]|\\.)*\$/g);
-    if (matches && matches.length > 0) {
-        
-        matches.forEach(function(match) {
-            var temp = match.substring(1, match.length - 1); // to remove dollars 
-            temp = M.sToMathE(temp, true);
-            var tempEle = $(document.createElement('div')).html(temp).html();
-            text = text.replace(match, tempEle);
-        });
+    text = String(text || '').replace(/\r\n|\r/g, '\n');
+    const mathPattern = /\$\$[\s\S]+?\$\$|\$(?!\$)(?:[^\$\\]|\\.)+?\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/g;
+
+    if (typeof katex === 'undefined' || !mathPattern.test(text)) {
+        return text.replace(/\n/g, '<br>');
     }
-    return text;
+    mathPattern.lastIndex = 0;
+
+    let result = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mathPattern.exec(text)) !== null) {
+        result += text.slice(lastIndex, match.index).replace(/\n/g, '<br>');
+
+        const fullMatch = match[0];
+        const displayMath = fullMatch.startsWith('$$') ? fullMatch.slice(2, -2) : null;
+        const inlineMath = fullMatch.startsWith('$') && !fullMatch.startsWith('$$') ? fullMatch.slice(1, -1) : null;
+        const inlineParenMath = fullMatch.startsWith('\\(') ? fullMatch.slice(2, -2) : null;
+        const displayBracketMath = fullMatch.startsWith('\\[') ? fullMatch.slice(2, -2) : null;
+        const latex = (displayMath || inlineMath || inlineParenMath || displayBracketMath || '').trim();
+        const displayMode = Boolean(displayMath || displayBracketMath);
+
+        if (!latex) {
+            result += fullMatch;
+        } else {
+            try {
+                result += katex.renderToString(latex, {
+                    throwOnError: false,
+                    trust: false,
+                    strict: "ignore",
+                    output: "htmlAndMathml",
+                    displayMode
+                });
+            } catch (error) {
+                result += fullMatch;
+            }
+        }
+
+        lastIndex = match.index + fullMatch.length;
+    }
+
+    result += text.slice(lastIndex).replace(/\n/g, '<br>');
+    return result;
+}
+
+function syncPreviewSpan($scope) {
+    const $previewSpan = $scope.closest('.previewspan');
+    const sourceValue = $previewSpan.find('.previewsrc').val() || '';
+    const renderedValue = getFormulaText(sourceValue);
+
+    $previewSpan.find('.valuetextbox').val(sourceValue);
+    $previewSpan.find('.previewdest').html(renderedValue.replace(/<br\s*\/?>/gi, '<div class="custom-break"></div>'));
+}
+
+function renderKatexQuestionBlock($question) {
+    const $questionLabel = $question.find('#questiontextlbl').first();
+    if ($questionLabel.length > 0) {
+        const source = $question.find('#questionText').val() || '';
+        const rendered = getFormulaText(source);
+        $questionLabel.html(rendered);
+        $question.find('#quespreview').html(rendered);
+    }
+
+    const $solutionLabel = $question.find('#solutionlbl').first();
+    if ($solutionLabel.length > 0) {
+        const source = $question.find('#solutionText').val() || '';
+        const rendered = getFormulaText(source);
+        $solutionLabel.html(rendered);
+        $question.find('#solutionpreview').html(rendered);
+    }
+
+    $question.find('#answerslist > li').each(function () {
+        const $answer = $(this);
+        const $answerLabel = $answer.find('#anstextlbl').first();
+        if ($answerLabel.length === 0) {
+            return;
+        }
+
+        const source = $answer.find('#ansvaltextbox').first().val() || '';
+        const rendered = getFormulaText(source);
+        $answerLabel.html(rendered);
+        $answer.find('#anspreview').first().html(rendered);
+    });
+}
+
+function renderKatexQuestionPage() {
+    $('#questionsList > li').each(function () {
+        renderKatexQuestionBlock($(this));
+    });
 }
 
 
@@ -520,7 +632,14 @@ function downloadJsonAsFile(filename, json) {
 
 
 $(function () {
+  renderKatexQuestionPage();
 
+  $(document).on('click', '.fix-katex', function (event) {
+    stopscroll(event);
+    runFixKatex(event);
+  });
+
+  
   $(document).on('click', '.gptgeneratesolution', function (event) {
     stopscroll(event);
     getMCQSolution(event);
@@ -531,6 +650,81 @@ $(function () {
     fixMCQSolution(event);
   }); 
 
+  $(document).on('click', '.jqm-to-katex', function (event) {
+      stopscroll(event);
+      const $question = $(this).closest('#question');
+
+      // Check if the question is in edit mode. In non-edit mode, textareas are hidden or have class '.ctxt'.
+      // If we see .clbl is visible (meaning not in edit mode), trigger '.editquestion'.
+      const hasLabels = $question.find('.clbl:visible').length > 0;
+      if (hasLabels) {
+          $question.find('.editquestion').first().trigger('click');
+      }
+      
+      const question = $question.find('#questionText').val() || '';
+      const solution = $question.find('#solutionText').val() || '';
+      const options = $question.find('#ansvaltextbox').map(function() {
+          return $(this).val() || '';
+      }).get();
+      const model = $('#modelSelect').val() || '';
+
+      if (!question && !solution && options.length === 0) {
+          bootbox.alert('No question, option, or solution content found.');
+          return;
+      }
+
+      const $btn = $(this);
+      const originalHtml = $btn.html();
+      $btn.html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $btn.addClass('disabled');
+
+      $.ajax({
+          url: '/tests/fixKatex',
+          method: 'POST',
+          data: {
+              question: question,
+              solution: solution,
+              options: options,
+              model: model
+          },
+          success: function(res) {
+              $btn.html(originalHtml).removeClass('disabled');
+              if (res && res.success) {
+                  if (typeof res.question !== 'undefined') {
+                      $question.find('#questionText').val(res.question);
+                      $question.find('#questionText').closest('.previewspan').find('.previewsrc').val(res.question);
+                  }
+                  if (typeof res.solution !== 'undefined') {
+                      $question.find('#solutionText').val(res.solution);
+                      $question.find('#solutionText').closest('.previewspan').find('.previewsrc').val(res.solution);
+                  }
+                  if (Array.isArray(res.options)) {
+                      $question.find('#ansvaltextbox').each(function(idx) {
+                          if (idx < res.options.length) {
+                              const val = res.options[idx];
+                              $(this).val(val);
+                              $(this).closest('.previewspan').find('.previewsrc').val(val);
+                          }
+                      });
+                  }
+                  
+                  if (typeof renderKatexQuestionBlock === 'function') {
+                      renderKatexQuestionBlock($question);
+                  }
+                  
+                  bootstrap_alert.success($question.find('#alertplaceholder'), "KaTeX syntax corrected! Preview the changes and click Save to apply.");
+              } else {
+                  bootbox.alert(res.message || 'Failed to fix KaTeX syntax.');
+              }
+          },
+          error: function(xhr, status, error) {
+              $btn.html(originalHtml).removeClass('disabled');
+              const err = xhr.responseJSON ? xhr.responseJSON.message : error;
+              bootbox.alert('Error correcting KaTeX: ' + err);
+          }
+      });
+  });
+
   $(document).on('click', '.splitoptionsbynewline', function (event) {
     stopscroll(event);
     paste4OptionsAlone(event);
@@ -538,8 +732,37 @@ $(function () {
 
   $(document).on('click', '.makejqmath', function (event) {
     stopscroll(event);
-    replaceSelectedText(latex_to_js(getselectedText()));
-  }); 
+    let targetElement = lastActiveElement;
+    if (!targetElement) {
+        targetElement = $(event.currentTarget).closest('#question').find('textarea.previewsrc').first()[0];
+    }
+    if (targetElement) {
+        let selectedText = getselectedText(targetElement);
+        let formattedText = convertNewLineToBrSafely(selectedText);
+        replaceSelectedText(formattedText, targetElement);
+    }
+  });
+
+  $(document).on('click', '.decode-entities', function (event) {
+    stopscroll(event);
+    let targetElement = lastActiveElement;
+    if (!targetElement) {
+        targetElement = $(event.currentTarget).closest('#question').find('textarea.previewsrc').first()[0];
+    }
+    if (targetElement) {
+        let selectedText = getselectedText(targetElement);
+        if (!selectedText) return;
+        const decoded = selectedText
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&apos;/g, "'");
+        replaceSelectedText(decoded, targetElement);
+    }
+  });
+
   $(document).on('click', '.makeanchor', function (event) {
     stopscroll(event);
     replaceSelectedText("<a href='javascript:void(0)' class='openinbrowser' ahref='" + getselectedText() + "'>" + getselectedText() + "</a>");
@@ -593,8 +816,10 @@ $(function () {
   });
 
   $(document).on('click', '.previewaction', function (event) {
-    console.log('preview fired')
-    $(this).closest('.previewspan').find('.previewdest').toggleClass('hidelem');
+    syncPreviewSpan($(this));
+    const $preview = $(this).closest('.previewspan').find('.previewdest');
+    $preview.toggleClass('hidelem');
+    $preview.css('display', $preview.hasClass('hidelem') ? 'none' : 'block');
   });
 
 
@@ -602,11 +827,13 @@ $(function () {
     let value = $(this).closest('.previewspan').find('.previewsrc').val();
     let formattedHtml = replaceBRwithNewLineAndBR(value);
     let lines = formattedHtml.split('\n').length;
-    $(this).closest('.previewspan').find('.previewsrc').val(formattedHtml); 
+    const $previewSpan = $(this).closest('.previewspan');
+    $previewSpan.find('.previewsrc').val(formattedHtml); 
     if (lines > 4) {
       if (lines > 25) { lines = 25 }
-      $(this).closest('.previewspan').find('.previewsrc').attr('rows', lines);
+      $previewSpan.find('.previewsrc').attr('rows', lines);
     } 
+    syncPreviewSpan($(this));
   });
   $(document).on('click', '.formathtml', function (event) { 
     let value = $(this).closest('.previewspan').find('.previewsrc').val(); 
@@ -615,18 +842,22 @@ $(function () {
         space_in_empty_paren: true
     }); 
     let lines = formattedHtml.split('\n').length;
-    $(this).closest('.previewspan').find('.previewsrc').val(formattedHtml); 
+    const $previewSpan = $(this).closest('.previewspan');
+    $previewSpan.find('.previewsrc').val(formattedHtml); 
     if (lines > 4) {
       if (lines > 25) { lines = 25 }
-      $(this).closest('.previewspan').find('.previewsrc').attr('rows', lines);
+      $previewSpan.find('.previewsrc').attr('rows', lines);
     } 
+    syncPreviewSpan($(this));
   });
 
 
   $(document).on('input', '.previewsrc', function (event) {
-    $(this).closest('.previewspan').find('.valuetextbox').val($(this).val())
-    let destval = getFormulaText($(this).val());
-    $(this).closest('.previewspan').find('.previewdest').html(destval) 
+    syncPreviewSpan($(this));
+    const $preview = $(this).closest('.previewspan').find('.previewdest');
+    if (!$preview.hasClass('hidelem')) {
+      $preview.css('display', 'block');
+    }
   });
 
 
@@ -690,12 +921,19 @@ async function getMCQSolution(event) {
 
 async function fixMCQSolution(event) {
     const $container = $(event.currentTarget).closest('#question');
+
     const payloadData = await getGptQuestionPayload($container);
     payloadData.solution = getCurrentQuestionSolution($container);
 
     if (!payloadData.question || !payloadData.solution) {
         showGptQuestionError($container, 'Question or existing solution is missing');
         return;
+    }
+
+    // Auto-toggle to edit mode if currently in preview mode (only after validation passes)
+    const hasLabels = $container.find('.clbl:visible').length > 0;
+    if (hasLabels) {
+        $container.find('.editquestion').first().trigger('click');
     }
 
     await requestAndApplyGptSolution({
@@ -709,8 +947,8 @@ async function fixMCQSolution(event) {
 async function getGptQuestionPayload($container) {
     const paragraphContext = getGptQuestionParagraphContext($container);
     const payload = {
-        question: $container.find('#questionText').val() || $container.find('#questiontextlbl').html() || '',
-        questionHtml: $container.find('#questiontextlbl').html() || $container.find('#questionText').val() || '',
+        question: $container.find('#questionText').val() || '',
+        questionHtml: $container.find('#questiontextlbl').html() || '',
         section: ($container.find('[id="section"]').first().text() || '').trim(),
         paragraphContext,
         options: $container.find('#ansvaltextbox').map(function () {
@@ -722,15 +960,16 @@ async function getGptQuestionPayload($container) {
         examContext: ($('#testdetails').text() || '').trim(),
         paperTitle: ($('#testdetails').text() || '').trim(),
         subjectKey: $('#testdetails').attr('subject_key'),
+        model: $('#modelSelect').val() || '',
     };
 
-    const spriteImages = await extractQuestionSpriteImages($container);
-    if (spriteImages.length > 0) {
-        payload.questionImageSources = spriteImages;
-        payload.questionImageDataUrls = spriteImages.map(item => item.dataUrl);
-        payload.questionImageDataUrl = spriteImages[0].dataUrl;
+    const combinedImages = await extractQuestionImages($container);
+    if (combinedImages.length > 0) {
+        payload.questionImageSources = combinedImages;
+        payload.questionImageDataUrls = combinedImages.map(item => item.dataUrl);
+        payload.questionImageDataUrl = combinedImages[0].dataUrl;
         payload.questionHasSpriteImages = true;
-        showSpriteExtractionBadge($container, spriteImages.length);
+        showSpriteExtractionBadge($container, combinedImages.length);
     } else {
         payload.questionHasSpriteImages = false;
         payload.questionImageSources = [];
@@ -1047,20 +1286,15 @@ function getGptQuestionParagraphContext($container) {
         return '';
     }
 
-    return $paragraphQuestion.find('#questionText').val()
-        || $paragraphQuestion.find('#questiontextlbl').html()
-        || '';
+    return $paragraphQuestion.find('#questionText').val() || '';
 }
 
 function getCurrentQuestionSolution($container) {
-    return $container.find('#solutionText').val()
-        || $container.find('#solutionlbl').html()
-        || $container.find('#solutionpreview').html()
-        || '';
+    return $container.find('#solutionText').val() || '';
 }
 
 function isGptQuestionAutoSaveEnabled() {
-    return $('#gptAutoSaveQuestion').is(':checked');
+    return false;
 }
 
 async function requestAndApplyGptSolution({ event, url, payloadData, loadingText }) {
@@ -1099,7 +1333,7 @@ async function requestAndApplyGptSolution({ event, url, payloadData, loadingText
 }
 
 function applyGptSolutionToQuestion($container, solution) {
-    solution = normalizeGptSolutionToJqMath(solution);
+    solution = normalizeGptSolutionToLatex(solution);
     const $hiddenInput = $container.find('#solutionText');
     $hiddenInput.val(solution);
 
@@ -1125,41 +1359,80 @@ function showGptQuestionProviderFeedback($container, data) {
     bootstrap_alert.success($container.find('#alertplaceholder'), message);
 }
 
-function normalizeGptSolutionToJqMath(solution) {
-    if (typeof latex_to_js !== 'function') {
-        return normalizeGptMarkdownFormatting(solution);
-    }
-
+function normalizeGptSolutionToLatex(solution) {
     const normalizedSolution = normalizeGptLatexSyntax(
         normalizeGptLatexDelimiters(stripGptSolutionHtml(solution))
     );
 
-    return normalizeGptMarkdownFormatting(latex_to_js(normalizedSolution));
+    return normalizeGptMarkdownFormatting(normalizedSolution);
 }
 
 function stripGptSolutionHtml(solution) {
-    solution = String(solution || '')
+    let textContent = String(solution || '');
+
+    // 1. Temporarily extract image tags/wrappers so jQuery does not strip them
+    const extracted = [];
+    const imgWrapperRegex = /(?:<br>\s*)?<div class="hscrollenable">.*?<img.*?>.*?<\/div>|<img[^>]+src=[^>]+>/gi;
+    
+    textContent = textContent.replace(imgWrapperRegex, (match) => {
+        const placeholder = `[[TEMP_STRIP_IMG_PLACEHOLDER_${extracted.length}]]`;
+        extracted.push({ placeholder, original: match });
+        return placeholder;
+    });
+
+    // 2. Perform standard HTML stripping
+    textContent = textContent
         .replace(/<(b|strong)>\s*([\s\S]*?)\s*<\/\1>/gi, '**$2**')
         .replace(/<(i|em)>\s*([\s\S]*?)\s*<\/\1>/gi, '_$2_');
 
-    const text = $('<div>').html(solution)
+    let text = $('<div>').html(textContent)
         .find('br').replaceWith('\n').end()
-        .find('p,div,li').append('\n').end()
+        .find('p,div,li').each(function() {
+            // Do not append newline for placeholders to avoid duplicate breaks
+            const html = $(this).html();
+            if (html && html.includes('TEMP_STRIP_IMG_PLACEHOLDER_')) {
+                return;
+            }
+            $(this).append('\n');
+        }).end()
         .text()
         .trim();
 
-    return text
+    text = text
         .replace(/\r\n|\r/g, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/[ \t]+\n/g, '\n')
         .trim();
+
+    // 3. Restore image tags
+    extracted.forEach(item => {
+        text = text.replace(item.placeholder, '\n' + item.original);
+    });
+
+    return text.trim();
 }
 
 function normalizeGptLatexDelimiters(solution) {
-    return solution
+    let res = solution
         .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')
-        .replace(/\\\[([\s\S]*?)\\\]/g, '$$$1$$')
-        .replace(/\$\$/g, '$');
+        .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
+
+    // Clean up any newlines or <br> tags immediately inside inline math ($...$)
+    res = res.replace(/\$([\s\S]*?)\$/g, (match, p1) => {
+        if (p1.startsWith('$') || p1.endsWith('$')) {
+            return match; // Let block math be processed by the next rule
+        }
+        const cleaned = p1.replace(/<br\s*\/?>/gi, '').replace(/\n/g, '').trim();
+        return `$${cleaned}$`;
+    });
+
+    // Clean up any newlines or <br> tags immediately inside block math ($$...$$)
+    res = res.replace(/\$$([\s\S]*?)\$\$/g, (match, p1) => {
+        const cleaned = p1.replace(/<br\s*\/?>/gi, '').replace(/\n/g, '').trim();
+        return `$$${cleaned}$$`;
+    });
+
+    return res;
 }
 
 function normalizeGptLatexSyntax(solution) {
@@ -1254,3 +1527,176 @@ function showGptQuestionError($container, message) {
     console.error(message);
     bootstrap_alert.error($container.find('#alertplaceholder'), message);
 }
+
+async function extractQuestionNormalImages($container) {
+    const imgElements = $container.find('img').toArray();
+    const images = [];
+    for (const imgEl of imgElements) {
+        try {
+            let src = imgEl.getAttribute('src');
+            if (!src) continue;
+
+            if (src.includes('sprite') || imgEl.classList.contains('sprite')) {
+                continue;
+            }
+
+            let dataUrl = '';
+            if (src.startsWith('data:image/')) {
+                dataUrl = src;
+            } else {
+                dataUrl = await imgToDataUrl(imgEl);
+            }
+
+            if (dataUrl) {
+                const sourceLabel = getSpriteSourceLabel(imgEl);
+                const answerIndex = $(imgEl).closest('li#answer').length > 0
+                    ? $(imgEl).closest('li#answer').parent().find('li#answer').index($(imgEl).closest('li#answer')) + 1
+                    : 0;
+
+                images.push({
+                    label: sourceLabel === 'question' ? 'question' : (sourceLabel.startsWith('option-') ? `option-${answerIndex}` : sourceLabel),
+                    sourceClass: String(imgEl.className || '').replace(/\s+/g, ' ').trim(),
+                    dataUrl
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to extract image element, skipping.', error);
+        }
+    }
+    return images;
+}
+
+function imgToDataUrl(imgEl) {
+    return new Promise((resolve) => {
+        if (imgEl.complete && imgEl.naturalWidth !== 0) {
+            resolve(convertImgToDataUrl(imgEl));
+        } else {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(convertImgToDataUrl(img));
+            img.onerror = () => resolve('');
+            img.src = imgEl.src;
+        }
+    });
+}
+
+function convertImgToDataUrl(img) {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 100;
+        canvas.height = img.naturalHeight || img.height || 100;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return canvas.toDataURL('image/png');
+    } catch (e) {
+        console.warn('Canvas conversion failed', e);
+        return '';
+    }
+}
+
+async function extractQuestionImages($container) {
+    const spriteImages = await extractQuestionSpriteImages($container);
+    const normalImages = await extractQuestionNormalImages($container);
+    const allImages = [...spriteImages];
+    const seenUrls = new Set(spriteImages.map(img => img.dataUrl));
+    for (const img of normalImages) {
+        if (!seenUrls.has(img.dataUrl)) {
+            allImages.push(img);
+            seenUrls.add(img.dataUrl);
+        }
+    }
+    return allImages;
+}
+
+async function runFixKatex(eventOrButton) {
+    const $button = (eventOrButton instanceof jQuery || (eventOrButton && eventOrButton.jquery)) ? eventOrButton : $(eventOrButton.currentTarget);
+    const $container = $button.closest('#question');
+    const mid = $container.attr('mid');
+    const collection = $('#testdetails').attr('collection');
+
+    if (!mid) {
+        bootstrap_alert.error($container.find('#alertplaceholder'), 'Please save the question first before converting to KaTeX.');
+        return false;
+    }
+
+    const question = $container.find('#questionText').val() || '';
+    const solution = $container.find('#solutionText').val() || '';
+    const options = $container.find('.valuetextbox').not('#questionText, #solutionText').map(function () {
+        return $(this).val() || '';
+    }).get();
+
+    const model = $('#modelSelect').val() || '';
+
+    // Set loading state on button
+    const originalHtml = $button.html();
+    $button.html('<i class="fa-solid fa-spinner fa-spin"></i> Converting...').addClass('disabled');
+
+    try {
+        const response = await fetch('/tests/fixKatex', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                collection,
+                mid,
+                question,
+                options,
+                solution,
+                model,
+                isKatexPage: true,
+                cssPath: typeof imagepath !== 'undefined' ? imagepath : '',
+                cdnRootKey: typeof cdnroot !== 'undefined' ? cdnroot : ''
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            // Update question fields in the DOM
+                if (data.question !== undefined) {
+                    const $qInput = $container.find('#questionText');
+                    $qInput.val(data.question);
+                    $qInput.closest('.previewspan').find('.previewsrc').val(data.question);
+                    $qInput.closest('.previewspan').find('.previewsrc').trigger('input');
+                }
+
+                // Update solution fields in the DOM
+                if (data.solution !== undefined) {
+                    const $sInput = $container.find('#solutionText');
+                    $sInput.val(data.solution);
+                    $sInput.closest('.previewspan').find('.previewsrc').val(data.solution);
+                    $sInput.closest('.previewspan').find('.previewsrc').trigger('input');
+                }
+
+                // Update option fields in the DOM
+                if (Array.isArray(data.options)) {
+                    let optIdx = 0;
+                    $container.find('.valuetextbox').not('#questionText, #solutionText').each(function () {
+                        const optVal = data.options[optIdx++];
+                        if (optVal !== undefined) {
+                            $(this).val(optVal);
+                            $(this).closest('.previewspan').find('.previewsrc').val(optVal);
+                            $(this).closest('.previewspan').find('.previewsrc').trigger('input');
+                        }
+                    });
+                }
+
+                // Force rendering of the updated KaTeX formulas
+                renderKatexQuestionBlock($container);
+
+                bootstrap_alert.success($container.find('#alertplaceholder'), 'KaTeX formula correction done. Review the fields and click Save when ready.');
+            return true;
+        } else {
+            bootstrap_alert.error($container.find('#alertplaceholder'), 'Conversion failed: ' + (data.message || 'Unknown error'));
+            return false;
+        }
+    } catch (error) {
+        console.error('Error during KaTeX formula fix:', error);
+        bootstrap_alert.error($container.find('#alertplaceholder'), 'Error connecting to server: ' + error.message);
+        return false;
+    } finally {
+        $button.html(originalHtml).removeClass('disabled');
+    }
+}
+
+

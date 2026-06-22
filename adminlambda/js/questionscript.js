@@ -1,4 +1,7 @@
 $(function () {
+  // Replace <br> with custom spacer on load
+  $("#questionsList span#questiontextlbl br, #questionsList span#anstextlbl br, #questionsList div#solutionlbl br").replaceWith('<div class="custom-break"></div>');
+
   $(document).on("click", ".deleteallquestions", function (event) {
     stopscroll(event);
     var qlist = $("#textrangeforedit").val().split("-");
@@ -559,11 +562,34 @@ function copyImageTag(ele, eve) {
   qtype = qtype.toLowerCase();
   if (imageprefix && imageprefix.length > 0) {
     let imgname = imageprefix + '_' + qtype + '_' + $(ele).closest('#question').find('#questionseqText').val();
-    //qseq = qtype+"_"+qseq; 
     imgname = imgname.replaceAll(/\./g, '_');
-    imageTag = '<div class="hscrollenable"><span class="sprite ' + imgname + '"></span></div>';
+    
+    // Resolve base CDN URL using the cdnroot key, matching CSSHEAD helper mapping dynamically
+    let cdnKey = (typeof cdnroot !== 'undefined' && cdnroot) ? cdnroot : 'EXAMCDN1';
+    let baseCDN = (typeof cdnRootPaths !== 'undefined' && cdnRootPaths && cdnRootPaths[cdnKey]) ? cdnRootPaths[cdnKey] : 'https://examsnet.github.io/cdn/img/';
+    
+    // Build folder path from the CSS file path (imagepath) if available and valid, otherwise fall back to imageprefix parsing
+    let cssFile = (typeof imagepath !== 'undefined' && imagepath && imagepath !== 'temp') ? imagepath.split(',')[0].trim() : '';
+    let folderPath = '';
+    if (cssFile) {
+      let folderName = cssFile.replace(/\.css$/i, '');
+      folderPath = baseCDN + folderName + '/';
+    } else {
+      let parts = imageprefix.split('_');
+      let year = parts[parts.length - 1];
+      if (/^\d{4}$/.test(year)) {
+        let rest = parts.slice(0, parts.length - 1).join('/');
+        folderPath = baseCDN + rest + '/' + year + '/';
+      } else {
+        folderPath = baseCDN + parts.join('/') + '/';
+      }
+    }
+    
+    imageTag = '<div class="hscrollenable"><img src="' + folderPath + imgname + '.png" /></div>';
   } else {
-    imageTag = '<div class="hscrollenable"><span class="sprite <<imgname>>"></span></div>';
+    // Fallback if no prefix is set
+    let defaultCDN = (typeof cdnRootPaths !== 'undefined' && cdnRootPaths && cdnRootPaths['EXAMCDN1']) ? cdnRootPaths['EXAMCDN1'] : 'https://examsnet.github.io/cdn/img/';
+    imageTag = '<div class="hscrollenable"><img src="' + defaultCDN + '<<imgname>>.png" /></div>';
   }
   console.log(imageTag);
   copyToClipboard(imageTag);
@@ -603,64 +629,16 @@ function saveQuestion(ele, eve) {
   }
 
 }
-function preprocessJqmathToTex(question) {
+function preprocessQuestionToTex(question) {
   if (!question || typeof question !== 'string') {
     return '';
   }
-
-  // Method 1: If jqmath_to_latex is available, use the comprehensive converter
-  if (typeof jqmath_to_latex === 'function') {
-    return jqmath_to_latex(question);
-  }
-
-  // Method 2: Fallback - extract from <fmath> elements if DOM is available
-  if (typeof document !== 'undefined') {
-    // Create a temporary container to parse the HTML
-    const container = document.createElement('div');
-    container.innerHTML = question;
-
-    // Find all fmath elements and convert them to LaTeX
-    container.querySelectorAll("fmath").forEach(node => {
-      let tex = node.getAttribute("alttext");
-      if (!tex) return;
-
-      // ---------- NORMALIZATION RULES ----------
-
-      // 1. Fix primes: S^{'} → S'
-      tex = tex.replace(/\^\{\s*'\s*\}/g, "'");
-
-      // 2. Remove spacing commands like \;
-      tex = tex.replace(/\\;/g, " ");
-
-      // 3. Normalize dot operator
-      tex = tex.replace(/⋅/g, "\\cdot");
-
-      // 4. Normalize min / max
-      tex = tex.replace(/\\min\s*\(/g, "\\min\\left(");
-      tex = tex.replace(/\\max\s*\(/g, "\\max\\left(");
-      tex = tex.replace(/\)(?!\s*\\right)/g, "\\right)");
-
-      // 5. Normalize multiple spaces
-      tex = tex.replace(/\s+/g, " ").trim();
-
-      const isInline = node.classList.contains("fm-inline");
-      const latex = isInline ? `$${tex}$` : `$$${tex}$$`;
-
-      node.replaceWith(document.createTextNode(latex));
-    });
-
-    // Strip remaining HTML
-    let output = container.textContent;
-    output = output.replace(/\s+/g, " ").trim();
-
-    return output;
-  }
-
-  // Method 3: Last resort - return as is
-  return question;
+  return String(question).trim();
 }
 
 function getQuestionPreviewData(parentelement, optype) {
+  const questionRaw = $(parentelement).find('#questionText').val();
+  
   let questiondata = {
     _id: $(parentelement).attr('mid'),
     subject_key: $('#testdetails').attr('subject_key'),
@@ -668,6 +646,7 @@ function getQuestionPreviewData(parentelement, optype) {
     testid: $('#testdetails').attr('testid'),
     questionid: $(parentelement).attr('questid'),
     question: $(parentelement).find('#questiontextlbl').html(),
+    questionraw: questionRaw,
     section: $(parentelement).find('#section').html().trim(),
     answertype: $(parentelement).find('#answerType:checked').val(),
     isverified: $(parentelement).find('#isverified:checked').val(),
@@ -677,23 +656,20 @@ function getQuestionPreviewData(parentelement, optype) {
     playlistid: $(parentelement).find('#playlistid').html(),
     yturl: $(parentelement).find('#yturl').html()
   }
-  // Convert to LaTeX - read from raw input field #questionText
-  questiondata.questiontex = preprocessJqmathToTex($(parentelement).find('#questionText').val());
   questiondata.questionseq = $(parentelement).find('#questionseqText').val();
   if (questiondata.questiontype !== "P") {
     const isChecked = document.getElementById('canpublishsols').checked;
     if (isChecked) {
+      const solutionRaw = $(parentelement).find('#solutionText').val();
       questiondata.solution = $(parentelement).find('#solutionlbl').html();
-      // Convert solution to LaTeX - read from raw input field #solutionText
-      questiondata.solutiontex = preprocessJqmathToTex($(parentelement).find('#solutionText').val());
+      questiondata.solutionraw = solutionRaw;
     } else {
       questiondata.solution = '';
-      questiondata.solutiontex = '';
+      questiondata.solutionraw = '';
     }
 
     questiondata.haspara = $(parentelement).find('#haspara:checked').val();
     questiondata.questiontype = $(parentelement).find('#questionType:checked').val();
-
 
     questiondata.quesmarks = $(parentelement).find('#quesmarks').html(),
       questiondata.quesnegmarks = $(parentelement).find('#quesnegmarks').html(),
@@ -703,23 +679,21 @@ function getQuestionPreviewData(parentelement, optype) {
       const rname = $(parentelement).find('#anschoice').attr('name');
       if (questiondata.answertype === "TX") {
         let textanswer = $(parentelement).find('#anstextlbl').html();
-        // Convert to LaTeX - read from raw input field #ansvaltextbox
         let textanswerRaw = $(parentelement).find('#ansvaltextbox').val();
         questiondata.answers.push({
           text: textanswer,
-          textex: preprocessJqmathToTex(textanswerRaw),
+          textraw: textanswerRaw,
           seq: 0
         });
         questiondata.correct = [textanswer];
       } else {
         questiondata.correct = selectedAnswers(rname);
         $(parentelement).find('#answerslist>li').each(function (id, val) {
-          const answerText = sanitizequestion($(val).find('#anstextlbl').html());
-          // Convert to LaTeX - read from raw input field #ansvaltextbox
+          const answerText = $(val).find('#anstextlbl').html();
           const answerTextRaw = $(val).find('#ansvaltextbox').val();
           questiondata.answers.push({
             text: answerText,
-            textex: preprocessJqmathToTex(answerTextRaw),
+            textraw: answerTextRaw,
             seq: val.getAttribute('aseq')
           });
         });
@@ -735,12 +709,11 @@ function getQuestionPreviewData(parentelement, optype) {
         }
         const choices = [];
         $(val).find('div#transchoice').each(function (idx, valu) {
-          const choiceText = sanitizequestion($(valu).find('#anstextlbl').html());
-          // Convert to LaTeX - read from raw input field #ansvaltextbox
+          const choiceText = $(valu).find('#anstextlbl').html();
           const choiceTextRaw = $(valu).find('#ansvaltextbox').val();
           choices.push({
             "text": choiceText,
-            "textex": preprocessJqmathToTex(choiceTextRaw),
+            "textraw": choiceTextRaw,
             "seq": idx
           });
         });
@@ -774,7 +747,7 @@ function getQuestionData(parentelement) {
   }
 
   if (questiondata.questiontype !== "P") {
-    questiondata.solution = $(parentelement).find('#solutionText').val(),
+    questiondata.solution = sanitizequestion($(parentelement).find('#solutionText').val()),
       questiondata.haspara = $(parentelement).find('#haspara:checked').val(),
       questiondata.questiontype = $(parentelement).find('#questionType:checked').val(),
 
@@ -787,7 +760,7 @@ function getQuestionData(parentelement) {
       const rname = $(parentelement).find('#anschoice').attr('name');
       if (questiondata.answertype === "TX") {
         let textanswer = $(parentelement).find('#ansvaltextbox').val();
-        questiondata.answers.push({ text: textanswer, seq: 0 })
+        questiondata.answers.push({ text: sanitizequestion(textanswer), seq: 0 })
         questiondata.correct = [textanswer];
       } else {
         questiondata.correct = selectedAnswers(rname);
@@ -870,9 +843,16 @@ function sanitizequestion(input) {
 
 
   let output = ele.html().replace(/ /g, ' ');
+  output = decodeHtmlEntities(output);
   output = output.trim();
 
   return output;
+}
+
+function decodeHtmlEntities(value) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = String(value || '');
+  return textarea.value;
 }
 
 
@@ -1054,7 +1034,7 @@ function paste4OptionsAlone(event) {
       var seq = answersList.find('li').length;
 
       options.forEach((option, index) => {
-        option = latex_to_js(option); // Convert LaTeX to JS format
+        option = String(option || '');
 
         var answerNode = $('#tpl_answer_r').clone();
         answerNode.find('#ansvaltextarea').text(option);
@@ -1115,14 +1095,13 @@ function pasteQuestionAndAnswers() {
     $(tpl).find('#questionseqlbl').html(prevseq);
     $(tpl).find('#questionseqText').attr("value", prevseq);
     let tempquestion = clipanswers[0];
-    //tempquestion = tempquestion.replace(/([:|.]([\r\n|\r|\n]))/g, '$1 <br> ');
-    //tempquestion = tempquestion.replace(/(\w)([\r\n|\r|\n])(\w)/g, '$1 $3');
+    if (typeof convertNewLineToBrSafely === 'function') {
+      tempquestion = convertNewLineToBrSafely(tempquestion);
+    } else {
+      tempquestion = processQuestion(tempquestion);
+    }
 
-    //tempquestion = tempquestion.replace(/([:.])[\r\n]+/g, '$1 <br> ');
-    //tempquestion = tempquestion.replace(/(\w)([\r\n|\r|\n])(\w)/g, '$1 $3');
-    tempquestion = processQuestion(tempquestion)
-
-    tempquestion = latex_to_js(tempquestion);
+    tempquestion = String(tempquestion || '');
     $(tpl).find('#questionTextArea').text(tempquestion);
     $(tpl).find('#questionText').attr("value", tempquestion);
     if (prevquestype === "P") {
@@ -1141,13 +1120,16 @@ function pasteQuestionAndAnswers() {
         let tnode = $('#tpl_answer_r').clone();
         let answer_text = clipanswers[i];
 
-        // Replace characters followed by newlines with <br>
-        answer_text = answer_text.replace(/([:|.]([\r\n|\r|\n]))/g, '$1 <br> ');
-        // Ensure proper spacing around words separated by newlines
-        answer_text = answer_text.replace(/(\w)([\r\n|\r|\n])(\w)/g, '$1 $3');
+        if (typeof convertNewLineToBrSafely === 'function') {
+          answer_text = convertNewLineToBrSafely(answer_text);
+        } else {
+          // Replace characters followed by newlines with <br>
+          answer_text = answer_text.replace(/([:|.]([\r\n|\r|\n]))/g, '$1 <br> ');
+          // Ensure proper spacing around words separated by newlines
+          answer_text = answer_text.replace(/(\w)([\r\n|\r|\n])(\w)/g, '$1 $3');
+        }
 
-        // Apply LaTeX conversion if enabled
-        answer_text = latex_to_js(answer_text);
+        answer_text = String(answer_text || '');
 
         // Remove leading <br> tags if present
         if (answer_text && answer_text.trim().startsWith('<br>')) {
@@ -1461,7 +1443,10 @@ function validateMissingImages(ele, vent) {
   var missingimagelist = '';
   var misClassNames = '';
   misClassNamesNoQuotes = [];
-  var missedImagLocation = {}
+  var missedImagLocation = {};
+  var missingImgElements = [];
+
+  // Check legacy sprites
   $('.clbl .hscrollenable .sprite').each((i, v) => {
     if (isMissingSprite(v)) {
       missedImagLocation = $(v).closest("#question").find("#questionseqlbl")[0];
@@ -1469,16 +1454,138 @@ function validateMissingImages(ele, vent) {
       misClassNames += "\"" + v.className.replace(/sprite/, '').trim() + "\",\n";
       misClassNamesNoQuotes.push(v.className.replace(/sprite/, '').trim());
     }
-  })
-  //alert(missingimagelist);
+  });
+
+  // Check converted/new img elements anywhere inside question/choice/solution labels
+  $('.clbl img').each((i, v) => {
+    if (v.naturalWidth === 0 || v.naturalHeight === 0 || (v.complete && v.naturalWidth === 0)) {
+      missedImagLocation = $(v).closest("#question").find("#questionseqlbl")[0];
+      missingimagelist += $(v).closest("#question").find("#questionseqlbl").html() + ", ";
+      let src = $(v).attr('src') || '';
+      let filename = src.substring(src.lastIndexOf('/') + 1);
+      misClassNames += "\"" + filename + "\",\n";
+      misClassNamesNoQuotes.push(filename);
+      missingImgElements.push(v);
+    }
+  });
+
   if (misClassNamesNoQuotes.length > 0) {
     document.title = misClassNamesNoQuotes.toString();
+  }
+
+  function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function removeImageFromString(text, src) {
+    if (!text) return '';
+    const escapedSrc = escapeRegExp(src);
+    const filename = src.substring(src.lastIndexOf('/') + 1);
+    const escapedFilename = escapeRegExp(filename);
+
+    // 1. Matches <div class="hscrollenable"> containing the img with this src
+    let regexDivSrc = new RegExp('<div\\s+class=["\']hscrollenable["\']>\\s*<img[^>]*src=["\'][^"\']*' + escapedSrc + '[^"\']*["\'][^>]*>\\s*</div>', 'gi');
+    text = text.replace(regexDivSrc, '');
+
+    // 2. Matches <div class="hscrollenable"> containing the img with this filename
+    let regexDivFilename = new RegExp('<div\\s+class=["\']hscrollenable["\']>\\s*<img[^>]*src=["\'][^"\']*' + escapedFilename + '[^"\']*["\'][^>]*>\\s*</div>', 'gi');
+    text = text.replace(regexDivFilename, '');
+
+    // 3. Matches bare <img ...> with this src
+    let regexImgSrc = new RegExp('<img[^>]*src=["\'][^"\']*' + escapedSrc + '[^"\']*["\'][^>]*>', 'gi');
+    text = text.replace(regexImgSrc, '');
+
+    // 4. Matches bare <img ...> with this filename
+    let regexImgFilename = new RegExp('<img[^>]*src=["\'][^"\']*' + escapedFilename + '[^"\']*["\'][^>]*>', 'gi');
+    text = text.replace(regexImgFilename, '');
+
+    return text;
   }
 
   if (misClassNames && misClassNames.length > 0) {
     console.log(misClassNames);
     bootstrap_alert.error($('.sticky-header').find('#alertplaceholder'), "Missing Images : " + misClassNames);
-    missedImagLocation.scrollIntoView();
+    if (missedImagLocation && missedImagLocation.scrollIntoView) {
+      missedImagLocation.scrollIntoView();
+    }
+
+    // Check if the 'Delete Missing' checkbox is checked
+    let deleteChecked = $('#deleteMissingImagesCheck').is(':checked');
+    if (deleteChecked && missingImgElements.length > 0) {
+      bootbox.confirm("Detected missing/broken <img> tags. Do you want to delete all missing <img> tags from the questions and save them?", function(result) {
+        if (result) {
+          let questionsToSave = new Set();
+
+          missingImgElements.forEach(imgEle => {
+            let $question = $(imgEle).closest('#question');
+            if ($question.length === 0) return;
+
+            let src = $(imgEle).attr('src') || '';
+            if (!src) return;
+
+            let updated = false;
+
+            // Question Text
+            let $qInput = $question.find('#questionText');
+            let $qTextarea = $qInput.siblings('.previewsrc');
+            if ($qInput.length > 0) {
+              let oldVal = $qInput.val();
+              let newVal = removeImageFromString(oldVal, src);
+              if (newVal !== oldVal) {
+                $qInput.val(newVal);
+                $qTextarea.val(newVal);
+                $qTextarea.trigger('input');
+                updated = true;
+              }
+            }
+
+            // Solution Text
+            let $sInput = $question.find('#solutionText');
+            let $sTextarea = $sInput.siblings('.previewsrc');
+            if ($sInput.length > 0) {
+              let oldVal = $sInput.val();
+              let newVal = removeImageFromString(oldVal, src);
+              if (newVal !== oldVal) {
+                $sInput.val(newVal);
+                $sTextarea.val(newVal);
+                $sTextarea.trigger('input');
+                updated = true;
+              }
+            }
+
+            // Answer Options
+            $question.find('#answerslist>li').each((id, val) => {
+              let $ansInput = $(val).find('#ansvaltextbox');
+              let $ansTextarea = $ansInput.siblings('.previewsrc');
+              if ($ansInput.length > 0) {
+                let oldVal = $ansInput.val();
+                let newVal = removeImageFromString(oldVal, src);
+                if (newVal !== oldVal) {
+                  $ansInput.val(newVal);
+                  $ansTextarea.val(newVal);
+                  $ansTextarea.trigger('input');
+                  updated = true;
+                }
+              }
+            });
+
+            if (updated) {
+              questionsToSave.add($question[0]);
+            }
+          });
+
+          if (questionsToSave.size > 0) {
+            questionsToSave.forEach(qEle => {
+              let saveBtn = $(qEle).find('.savequestion:first');
+              if (saveBtn.length > 0) {
+                saveBtn.trigger('click');
+              }
+            });
+            bootstrap_alert.success($('.sticky-header').find('#alertplaceholder'), "Successfully deleted and triggered save for " + questionsToSave.size + " questions.");
+          }
+        }
+      });
+    }
   } else {
     bootstrap_alert.success($('.sticky-header').find('#alertplaceholder'), "No Missing Images found");
     misClassNames = 'None Missing.'
@@ -1809,7 +1916,7 @@ function downloadmobilefile(that, event) {
   data.testid = testdata.testid;
   data.categorykey = $('#testdetails').attr('categorykey');
   data.is_cdn_https = testdata.is_cdn_https;
-  data.cdn_root_key = testdata.cdn_root_key || 'CDN1';
+  data.cdn_root_key = testdata.cdn_root_key || 'EXAMCDN1';
   data.questionImagesCdn = testdata.test_image;
   data.questionImages = (testdata.test_image) ? testdata.test_image.substring(testdata.test_image.lastIndexOf('/') + 1, testdata.test_image.length) : ''
   if (testdata.test_file_name && testdata.test_file_name.length > 0) { } else {
@@ -1859,7 +1966,7 @@ function downloadGitHubmobilefile(that, event) {
   data.testid = testdata.testid;
   data.categorykey = $('#testdetails').attr('categorykey');
   data.is_cdn_https = testdata.is_cdn_https;
-  data.cdn_root_key = testdata.cdn_root_key || 'CDN1';
+  data.cdn_root_key = testdata.cdn_root_key || 'EXAMCDN1';
   data.questionImagesCdn = testdata.test_image;
   data.questionImages = (testdata.test_image) ? testdata.test_image.substring(testdata.test_image.lastIndexOf('/') + 1, testdata.test_image.length) : ''
   if (testdata.mobile_file_name && testdata.mobile_file_name.length > 0) { } else {
@@ -1917,7 +2024,7 @@ function downloadGitHubmobilefileExamsnetApp(that, event) {
   data.testid = testdata.testid;
   data.categorykey = $('#testdetails').attr('categorykey');
   data.is_cdn_https = testdata.is_cdn_https;
-  data.cdn_root_key = testdata.cdn_root_key || 'CDN1';
+  data.cdn_root_key = testdata.cdn_root_key || 'EXAMCDN1';
   data.questionImagesCdn = testdata.test_image;
   data.questionImages = (testdata.test_image) ? testdata.test_image.substring(testdata.test_image.lastIndexOf('/') + 1, testdata.test_image.length) : ''
   if (testdata.mobile_file_name && testdata.mobile_file_name.length > 0) { } else {

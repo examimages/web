@@ -1019,10 +1019,10 @@ function decisionFormatter(params) {
 
 
 const cdnRoots = [
-    { key: 'CDN1', title: 'CDN 1' },
-    { key: 'CDN2', title: 'CDN 2' },
     { key: 'EXAMCDN1', title: 'EXAMCDN1' },
-    { key: 'EXAMCDN2', title: 'EXAMCDN2' }
+    { key: 'EXAMCDN2', title: 'EXAMCDN2' },
+    { key: 'EXAMCDN3', title: 'EXAMCDN3' },
+    { key: 'CDN1', title: 'CDN1' }
 ];
 
 const cdnRootOptions = cdnRoots.map(root => root.key);
@@ -1030,7 +1030,7 @@ const cdnRootParams = { values: cdnRootOptions }
 
 function cdnRootFormatter(params) {
     const root = cdnRoots.find(root => root.key === params.value);
-    return root ? root.title : (params.value || 'CDN 1');
+    return root ? root.title : (params.value || 'EXAMCDN1');
 }
 
 
@@ -1116,6 +1116,7 @@ var SCREENLIST = {
   USERPROFILES: 'USERPROFILES',
   ACTIONS: 'ACTIONS',
   NOTECHAPTERS: 'NOTECHAPTERS',
+  CHAPTERS: 'CHAPTERS',
 }
 function generateTempId() {
   return "temp_" + Math.random().toString(36).substring(2, 11);
@@ -1124,8 +1125,46 @@ function generateTempId() {
 function custOnAgGridReady(params) {
   console.log("On Grid Ready fired..")
   gridApi = params.api;
-  columnApi = params.columnApi.api;   
+  columnApi = params.api; // AG Grid v31+: columnApi merged into api
+
+  // Restore column visibility preference (skip for subjects and chapters page to keep hidden by default)
+  if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+    const showUtils = localStorage.getItem('showGridUtilityCols') === 'true';
+    if (showUtils) {
+      let colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+      if (currentScreen === SCREENLIST.CHAPTERS) {
+        colsToToggle = ["data-actions", "utility-actions"];
+      }
+      columnApi.setColumnsVisible(colsToToggle, true);
+      $('.toggleUtilityCols').removeClass('btn-outline-secondary').addClass('btn-secondary active');
+    }
+  }
 }
+
+$(document).on('click', '.toggleUtilityCols', function (event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const isVisible = columnApi.getColumn('utility-actions') ? columnApi.getColumn('utility-actions').isVisible() : false;
+  
+  let colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+  if (currentScreen === SCREENLIST.SUBJECTS) {
+    colsToToggle = ["utility-actions", "new-mobile-actions", "examsnetapp-mobile-actions"];
+  } else if (currentScreen === SCREENLIST.CHAPTERS) {
+    colsToToggle = ["data-actions", "utility-actions"];
+  }
+  columnApi.setColumnsVisible(colsToToggle, !isVisible);
+  
+  if (!isVisible) {
+    $('.toggleUtilityCols').removeClass('btn-outline-secondary').addClass('btn-secondary active');
+    if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+      localStorage.setItem('showGridUtilityCols', 'true');
+    }
+  } else {
+    $('.toggleUtilityCols').removeClass('btn-secondary active').addClass('btn-outline-secondary');
+    if (currentScreen !== SCREENLIST.SUBJECTS && currentScreen !== SCREENLIST.CHAPTERS) {
+      localStorage.setItem('showGridUtilityCols', 'false');
+    }
+  }
+});
 
 function cellDataChanged(params) {
   console.log("Cell Data values changed..")

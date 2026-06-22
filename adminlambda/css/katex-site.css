@@ -63,7 +63,12 @@
   text-align: left !important;
 }
 
-/* Force hide mathml rendering to prevent double formula rendering */
-.katex-mathml {
-  display: none !important;
+/* Custom break spacer element spacing */
+.custom-break {
+  display: block !important;
+  height: 0 !important;
+  margin-top: 1.2rem !important;
+  margin-bottom: 1.2rem !important;
 }
+
+

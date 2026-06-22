@@ -11,6 +11,7 @@ var note_endDefaultCols = [
 var note_adminColsTestPage = [
     
     { headerName: 'Published', field: 'published', cellEditor: 'agSelectCellEditor', cellEditorParams: decisionParams, valueFormatter: decisionFormatter, editable: false, width: 100 },
+
     { headerName: 'Language', field: 'test_lang', cellEditor: 'agSelectCellEditor', cellEditorParams: languageParams, valueFormatter: languageFormatter, editable: false, flex:1 },
 
     { headerName: 'CSS Path', field: 'test_image', cellClass: 'ag-cell-no-wrap', hide: true, editable: false, flex:1 },
@@ -32,8 +33,7 @@ var note_adminColsTestPage = [
     { headerName: 'HTML Title', field: 't_title', hide: true, cellClass: 'ag-cell-no-wrap' },
     { headerName: 'Data Actions', field: 'data-actions', cellRenderer: dataactions, pinned: 'right', hide:true, width:230},
     { headerName: 'Utilities', field: 'extra-actions', cellRenderer: extraactions, pinned: 'right', hide:true, flex:1 },
-    { headerName: 'Publish Actions', field: 'selenium-actions', cellRenderer: seliniumactions, pinned: 'right', hide:true, width:130 },
-
+    
     { headerName: 'Del', field: 'delete-action', cellRenderer: deleteRender, width: 50, hide:true, pinned: 'right' },
 ]
 
@@ -269,25 +269,6 @@ function dataactions(params){
     return container;
 }
 
-function seliniumactions(params){
-    const container = document.createElement('div'); 
-    let buttonHtml = ``
-    if (params.data._id) {
-        buttonHtml+=`
-        <a href="#" class="btn btn-sm btn-outline-warning selinium-notes-download" id="selinium-notes-download" data-id="${params.data._id}" title="Total Questions in test">
-            <i class="fa-solid fa-download"></i><i class="fa-solid fa-spinner  fa-spin-pulse" style="display: none;"></i>
-        </a>`; 
-    }
-     
-     
-    container.innerHTML = buttonHtml;
-    if(container.querySelector('.selinium-notes-download')){
-        container.querySelector('.selinium-notes-download').addEventListener('click', (event) => handleButtonClick(event, params));  
-    }
-     
-
-    return container;
-}
 
 function extraactions(params) {  
     const container = document.createElement('div'); 
@@ -390,8 +371,7 @@ function handleButtonClick(event, params) {
         'copy-questions-to-new-collection': () => copyQuestionsToNewCollection(params),
         'copy-collection-details': () => copyCollectionDetails(params),
         'texturepackimages': () => texturepackimages(event, params),
-        'copytospritepath': () => copytospritepath(event, params),
-        'selinium-notes-download': () => seleniumNotesDownload(event, params)
+        'copytospritepath': () => copytospritepath(event, params)
         
     };
 
@@ -399,9 +379,6 @@ function handleButtonClick(event, params) {
     if (handler) handler();
 }
 
-function seleniumNotesDownload(event, params){
-    console.log("Yet to implement")
-}
 
 
 function copytospritepath(event, params) {
@@ -583,13 +560,7 @@ $(function () {
     });
     
 
-    $(document).on('click', '.seleniumActions', function (event) {
-        stopscroll(event);
-        var visibility = columnApi.getColumn("selenium-actions").visible
-        columnApi.setColumnVisible("selenium-actions", !visibility);
-         
-    });
-
+    
     $(document).on('click', '.dataActions', function (event) {
         stopscroll(event);
         var visibility = columnApi.getColumn("data-actions").visible
@@ -674,6 +645,7 @@ $(function () {
             imageprefix: '',
             is_cdn_https: decisionOptions[0],
             cdn_root_key: cdnRootOptions[0],
+
             link: '',
             test_file_title: '',
             test_file_name: '',
